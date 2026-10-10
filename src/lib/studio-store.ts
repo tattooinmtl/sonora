@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Wave } from "@/lib/waves";
 
+export type FieldView = "side" | "both" | "top";
+
 export type StudioState = {
   speed: number;
   trail: number;
@@ -18,6 +20,7 @@ export type StudioState = {
   fieldLabel: string | null;
   fieldPreview: number[] | null;
   exportRequest: number;
+  view: FieldView;
   setSpeed: (v: number) => void;
   setTrail: (v: number) => void;
   setPalette: (id: string) => void;
@@ -32,6 +35,7 @@ export type StudioState = {
   toggleMin: () => void;
   toggleStabilize: () => void;
   requestExport: () => void;
+  setView: (view: FieldView) => void;
   setFieldTone: (label: string | null, preview: number[] | null) => void;
 };
 
@@ -52,6 +56,7 @@ export const useStudio = create<StudioState>((set) => ({
   fieldLabel: null,
   fieldPreview: null,
   exportRequest: 0,
+  view: "both",
   setSpeed: (speed) => set({ speed }),
   setTrail: (trail) => set({ trail }),
   setPalette: (paletteId) => set({ paletteId }),
@@ -78,5 +83,6 @@ export const useStudio = create<StudioState>((set) => ({
       fieldPreview: s.stabilized ? null : s.fieldPreview,
     })),
   requestExport: () => set((s) => ({ exportRequest: s.exportRequest + 1 })),
+  setView: (view) => set({ view }),
   setFieldTone: (fieldLabel, fieldPreview) => set({ fieldLabel, fieldPreview }),
 }));

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect } from "react";
-import { FieldCanvas } from "@/components/field-canvas";
+import { FieldStage } from "@/components/field-stage";
 import { StudioDock } from "@/components/studio-dock";
 import { audioEngine } from "@/lib/audio-engine";
 import { bindStudioAudio } from "@/lib/performance";
@@ -22,7 +22,7 @@ function Home() {
 
   return (
     <main className="relative h-dvh w-full overflow-hidden bg-bg text-fg select-none">
-      <FieldCanvas />
+      <FieldStage />
       <StudioDock />
     </main>
   );

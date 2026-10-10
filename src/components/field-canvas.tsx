@@ -212,8 +212,10 @@ function publishTone(shape: Float32Array, freq: number, label: string) {
   }
 }
 
-export function FieldCanvas() {
+export function FieldCanvas({ contained = false }: { contained?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const containedRef = useRef(contained);
+  containedRef.current = contained;
 
   useEffect(() => {
     const canvas = ref.current;
@@ -370,15 +372,18 @@ export function FieldCanvas() {
 
       if (state.exportRequest !== lastExport) {
         lastExport = state.exportRequest;
-        const a = document.createElement("a");
-        a.download = `sonora-${state.seed}.png`;
-        a.href = canvas.toDataURL("image/png");
-        a.click();
+        if (state.view === "side") {
+          const a = document.createElement("a");
+          a.download = `sonora-${state.seed}.png`;
+          a.href = canvas.toDataURL("image/png");
+          a.click();
+        }
       }
 
       const colors = paletteById(state.paletteId).colors;
-      const openTop = state.topInset;
-      const openBottom = Math.max(openTop + 120, h - state.bottomInset);
+      const local = containedRef.current;
+      const openTop = local ? 8 : state.topInset;
+      const openBottom = local ? Math.max(openTop + 48, h - 8) : Math.max(openTop + 120, h - state.bottomInset);
       const top = openTop + 16;
       const bottom = openBottom - 12;
       const noteKey = state.notes.join(",");
@@ -568,5 +573,12 @@ export function FieldCanvas() {
     };
   }, []);
 
-  return <canvas ref={ref} className="absolute inset-0 h-full w-full touch-none" aria-hidden />;
+  return (
+    <canvas
+      ref={ref}
+      data-sonora="side"
+      className="absolute inset-0 h-full w-full touch-none"
+      aria-hidden
+    />
+  );
 }

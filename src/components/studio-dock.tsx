@@ -3,7 +3,7 @@ import { Download, Pause, Play, SlidersHorizontal } from "lucide-react";
 import { audioEngine } from "@/lib/audio-engine";
 import { PALETTES } from "@/lib/palettes";
 import { pressNote, releaseNote } from "@/lib/performance";
-import { useStudio } from "@/lib/studio-store";
+import { useStudio, type FieldView } from "@/lib/studio-store";
 import { noteName, pianoKeys, WAVES, WHITE_KEY_COUNT, type Wave } from "@/lib/waves";
 
 const WHITE_STEPS = [0, 2, 4, 5, 7, 9, 11, 12, 14, 16];
@@ -61,6 +61,7 @@ export function StudioDock() {
   const octave = useStudio((s) => s.octave);
   const fieldLabel = useStudio((s) => s.fieldLabel);
   const fieldPreview = useStudio((s) => s.fieldPreview);
+  const view = useStudio((s) => s.view);
 
   const headerRef = useRef<HTMLElement>(null);
   const dockRef = useRef<HTMLDivElement>(null);
@@ -201,7 +202,7 @@ export function StudioDock() {
       >
         <div className="min-w-0">
           <h1 className="font-display text-2xl leading-none tracking-tight text-fg">Sonora</h1>
-          <p className="mt-1 text-sm text-muted">Particles take the shape of a tone</p>
+          <p className="mt-1 text-sm text-muted">Same tone, from the side and above</p>
         </div>
         <div className="pointer-events-auto flex shrink-0 gap-2">
           <button
@@ -244,6 +245,30 @@ export function StudioDock() {
         }`}
       >
         <div className="dock-scroll panel-shadow mx-auto flex w-full max-w-5xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-3">
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Field view">
+            {(
+              [
+                ["side", "Side"],
+                ["both", "Both"],
+                ["top", "Top"],
+              ] as const
+            ).map(([id, label]) => {
+              const on = view === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => useStudio.getState().setView(id as FieldView)}
+                  className={`h-11 rounded-md border text-sm font-medium transition-colors duration-quick ease-smooth ${
+                    on ? "border-fg bg-fg text-bg" : "border-line bg-surface-2 text-fg"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
               {WAVES.map((w) => {
