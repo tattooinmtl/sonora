@@ -60,7 +60,7 @@ export function FieldStage() {
     >
       <div className={`relative min-h-36 ${view === "both" ? "flex-[5]" : "min-h-0 flex-1"}`}>
         <TopField />
-        <Caption className="bottom-2 left-4">Top</Caption>
+        <Caption className="bottom-2 left-4">Plate</Caption>
       </div>
       {view === "both" ? (
         <div className="relative min-h-0 flex-[6] border-t border-line">

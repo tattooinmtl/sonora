@@ -34,6 +34,7 @@ export function bindStudioAudio() {
   const unsub = useStudio.subscribe((s, p) => {
     if (s.volume !== p.volume) audioEngine.setVolume(s.volume);
     if (s.wave !== p.wave) audioEngine.setWave(s.wave);
+    if (s.hz !== p.hz || s.wave !== p.wave) audioEngine.setDrive(s.hz);
     if (s.stabilized !== p.stabilized) {
       audioEngine.setKeyDuck(s.stabilized ? 0.2 : 1);
       if (!s.stabilized) audioEngine.stopField();

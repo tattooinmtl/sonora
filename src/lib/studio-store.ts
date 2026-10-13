@@ -1,3 +1,4 @@
+import { clampHz } from "@/lib/chladni";
 import { create } from "zustand";
 import type { Wave } from "@/lib/waves";
 
@@ -21,6 +22,8 @@ export type StudioState = {
   fieldPreview: number[] | null;
   exportRequest: number;
   view: FieldView;
+  hz: number;
+  scalePlate: boolean;
   setSpeed: (v: number) => void;
   setTrail: (v: number) => void;
   setPalette: (id: string) => void;
@@ -36,6 +39,8 @@ export type StudioState = {
   toggleStabilize: () => void;
   requestExport: () => void;
   setView: (view: FieldView) => void;
+  setHz: (hz: number) => void;
+  setScalePlate: (scale: boolean) => void;
   setFieldTone: (label: string | null, preview: number[] | null) => void;
 };
 
@@ -56,7 +61,9 @@ export const useStudio = create<StudioState>((set) => ({
   fieldLabel: null,
   fieldPreview: null,
   exportRequest: 0,
-  view: "both",
+  view: "top",
+  hz: 440,
+  scalePlate: false,
   setSpeed: (speed) => set({ speed }),
   setTrail: (trail) => set({ trail }),
   setPalette: (paletteId) => set({ paletteId }),
@@ -84,5 +91,7 @@ export const useStudio = create<StudioState>((set) => ({
     })),
   requestExport: () => set((s) => ({ exportRequest: s.exportRequest + 1 })),
   setView: (view) => set({ view }),
+  setHz: (hz) => set({ hz: clampHz(hz) }),
+  setScalePlate: (scalePlate) => set({ scalePlate }),
   setFieldTone: (fieldLabel, fieldPreview) => set({ fieldLabel, fieldPreview }),
 }));

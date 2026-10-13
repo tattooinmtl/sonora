@@ -1,6 +1,16 @@
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { Download, Pause, Play, SlidersHorizontal } from "lucide-react";
 import { audioEngine } from "@/lib/audio-engine";
+import {
+  describeHz,
+  formatHz,
+  hzToSlider,
+  plateSentence,
+  sliderToHz,
+  UNITS,
+  unitFor,
+  type UnitId,
+} from "@/lib/chladni";
 import { PALETTES } from "@/lib/palettes";
 import { pressNote, releaseNote } from "@/lib/performance";
 import { useStudio, type FieldView } from "@/lib/studio-store";
@@ -31,6 +41,174 @@ function WaveIcon({ type }: { type: Wave }) {
   );
 }
 
+const PRESETS = [
+  { label: "0.01 Hz", hz: 0.01 },
+  { label: "110 Hz", hz: 110 },
+  { label: "440 Hz", hz: 440 },
+  { label: "1 kHz", hz: 1e3 },
+  { label: "20 kHz", hz: 2e4 },
+  { label: "1 MHz", hz: 1e6 },
+  { label: "1 GHz", hz: 1e9 },
+  { label: "74 THz", hz: 74e12 },
+] as const;
+
+function ToneGenerator() {
+  const hz = useStudio((s) => s.hz);
+  const wave = useStudio((s) => s.wave);
+  const scalePlate = useStudio((s) => s.scalePlate);
+  const read = describeHz(hz);
+  const [unit, setUnit] = useState<UnitId>(() => unitFor(hz).id);
+  const [text, setText] = useState(() => {
+    const u = unitFor(hz);
+    return String(hz / u.mul);
+  });
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (focused.current) return;
+    const u = unitFor(hz);
+    setUnit(u.id);
+    const shown = hz / u.mul;
+    setText(shown >= 100 ? String(Math.round(shown)) : String(Math.round(shown * 1000) / 1000));
+  }, [hz]);
+
+  const commit = (raw: string, nextUnit: UnitId) => {
+    const mul = UNITS.find((u) => u.id === nextUnit)?.mul ?? 1;
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return;
+    const next = value * mul;
+    audioEngine.unlock();
+    useStudio.getState().setHz(next);
+    audioEngine.setDrive(useStudio.getState().hz);
+  };
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-medium text-muted">Tone</p>
+        <p className="mt-1 font-display text-4xl leading-none tracking-tight text-fg tabular-nums">{formatHz(hz)}</p>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <label className="block min-w-0 flex-1">
+          <span className="sr-only">Frequency</span>
+          <input
+            className="h-12 w-full rounded-md border border-line bg-surface-2 px-3 text-lg text-fg tabular-nums"
+            inputMode="decimal"
+            value={text}
+            aria-label="Frequency"
+            onFocus={() => {
+              focused.current = true;
+            }}
+            onBlur={() => {
+              focused.current = false;
+              commit(text, unit);
+            }}
+            onChange={(e) => {
+              setText(e.target.value);
+              const value = Number(e.target.value);
+              if (Number.isFinite(value) && value > 0) commit(e.target.value, unit);
+            }}
+          />
+        </label>
+        <div className="grid grid-cols-5 gap-2 sm:flex" role="group" aria-label="Frequency unit">
+          {UNITS.map((u) => {
+            const on = unit === u.id;
+            return (
+              <button
+                key={u.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => {
+                  setUnit(u.id);
+                  const shown = hz / u.mul;
+                  const next = shown >= 100 ? String(Math.round(shown)) : String(Math.round(shown * 1000) / 1000);
+                  setText(next);
+                }}
+                className={`h-12 rounded-md border px-3 text-sm font-medium sm:min-w-16 ${
+                  on ? "border-fg bg-fg text-bg" : "border-line bg-surface-2 text-fg"
+                }`}
+              >
+                {u.id}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <label className="block">
+        <span className="sr-only">Frequency slider</span>
+        <input
+          className="slider"
+          type="range"
+          min={0}
+          max={1000}
+          step={1}
+          value={hzToSlider(hz)}
+          aria-label="Frequency from 0.01 hertz to 100 terahertz"
+          onChange={(e) => {
+            audioEngine.unlock();
+            const next = sliderToHz(Number(e.target.value));
+            useStudio.getState().setHz(next);
+            audioEngine.setDrive(next);
+          }}
+        />
+      </label>
+      <div className="flex flex-wrap gap-2">
+        {PRESETS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            onClick={() => {
+              audioEngine.unlock();
+              useStudio.getState().setHz(p.hz);
+              audioEngine.setDrive(p.hz);
+            }}
+            className={`h-11 rounded-md border px-3 text-sm font-medium ${
+              Math.abs(hz - p.hz) / p.hz < 0.02 ? "border-fg bg-fg text-bg" : "border-line bg-surface-2 text-fg"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {WAVES.map((w) => {
+          const on = wave === w.id;
+          return (
+            <button
+              key={w.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => {
+                audioEngine.unlock();
+                useStudio.getState().setWave(w.id);
+              }}
+              className={`flex h-12 items-center justify-center gap-2 rounded-md border text-sm font-medium ${
+                on ? "border-fg bg-fg text-bg" : "border-line bg-surface-2 text-fg"
+              }`}
+            >
+              <WaveIcon type={w.id} />
+              <span>{w.label}</span>
+            </button>
+          );
+        })}
+      </div>
+      <p className="text-sm leading-relaxed text-muted">{plateSentence(hz, scalePlate)}</p>
+      {read.resolved ? null : (
+        <button
+          type="button"
+          aria-pressed={scalePlate}
+          onClick={() => useStudio.getState().setScalePlate(!scalePlate)}
+          className={`h-12 rounded-md text-sm font-medium ${
+            scalePlate ? "bg-accent text-bg" : "border border-line bg-surface-2 text-fg"
+          }`}
+        >
+          {scalePlate ? "Showing a scaled figure" : "Show the scaled figure"}
+        </button>
+      )}
+    </section>
+  );
+}
+
 function Spark({ data }: { data: number[] }) {
   const d = data
     .map((v, i) => `${i === 0 ? "M" : "L"}${i} ${12 - v * 9}`)
@@ -53,7 +231,6 @@ export function StudioDock() {
   const paletteId = useStudio((s) => s.paletteId);
   const seed = useStudio((s) => s.seed);
   const paused = useStudio((s) => s.paused);
-  const wave = useStudio((s) => s.wave);
   const volume = useStudio((s) => s.volume);
   const minimized = useStudio((s) => s.minimized);
   const stabilized = useStudio((s) => s.stabilized);
@@ -202,7 +379,7 @@ export function StudioDock() {
       >
         <div className="min-w-0">
           <h1 className="font-display text-2xl leading-none tracking-tight text-fg">Sonora</h1>
-          <p className="mt-1 text-sm text-muted">Same tone, from the side and above</p>
+          <p className="mt-1 text-sm text-muted">Sand on a singing plate</p>
         </div>
         <div className="pointer-events-auto flex shrink-0 gap-2">
           <button
@@ -244,8 +421,11 @@ export function StudioDock() {
           minimized ? "pointer-events-none translate-y-full" : "translate-y-0"
         }`}
       >
-        <div className="dock-scroll panel-shadow mx-auto flex w-full max-w-5xl flex-col gap-2 overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-3">
-          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Field view">
+        <div className="dock-scroll panel-shadow mx-auto flex w-full max-w-3xl flex-col gap-6 overflow-y-auto overscroll-contain rounded-xl border border-line bg-surface p-4 sm:p-5">
+          <ToneGenerator />
+          <section className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-muted">View</p>
+            <div className="grid grid-cols-3 gap-2" role="group" aria-label="Field view">
             {(
               [
                 ["side", "Side"],
@@ -269,31 +449,11 @@ export function StudioDock() {
               );
             })}
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div className="grid flex-1 grid-cols-2 gap-2 sm:grid-cols-4">
-              {WAVES.map((w) => {
-                const on = wave === w.id;
-                return (
-                  <button
-                    key={w.id}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => {
-                      audioEngine.unlock();
-                      useStudio.getState().setWave(w.id);
-                    }}
-                    className={`flex h-11 items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors duration-quick ease-smooth ${
-                      on ? "border-fg bg-fg text-bg" : "border-line bg-surface-2 text-fg"
-                    }`}
-                  >
-                    <WaveIcon type={w.id} />
-                    <span>{w.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-            <label className="block min-w-0 sm:w-44">
-              <span className="flex items-baseline justify-between text-xs font-medium text-muted">
+          </section>
+          <section className="flex flex-col gap-4">
+            <p className="text-sm font-medium text-muted">Plate</p>
+            <label className="block">
+              <span className="flex items-baseline justify-between text-sm font-medium text-muted">
                 Volume
                 <span className="tabular-nums text-fg">{Math.round(volume * 100)}</span>
               </span>
@@ -308,7 +468,7 @@ export function StudioDock() {
                 onChange={(e) => useStudio.getState().setVolume(Number(e.target.value))}
               />
             </label>
-          </div>
+          </section>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
@@ -418,7 +578,14 @@ export function StudioDock() {
             </div>
           ) : null}
 
-          <div
+          <section className="flex flex-col gap-3">
+            <div>
+              <p className="text-sm font-medium text-muted">Piano</p>
+              <p className="mt-1 text-sm leading-relaxed text-muted">
+                Or hold a key. The plate follows the keys while they are down, then returns to the frequency above.
+              </p>
+            </div>
+            <div
             ref={pianoRef}
             className="relative h-24 overflow-x-auto overflow-y-hidden rounded-md border border-line bg-ebony touch-pan-x"
             onPointerDown={pointerDown}
@@ -468,6 +635,7 @@ export function StudioDock() {
               })}
             </div>
           </div>
+          </section>
         </div>
       </div>
 

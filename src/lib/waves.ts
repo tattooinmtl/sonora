@@ -13,6 +13,12 @@ export function midiToFreq(midi: number) {
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
+export function hzToMidi(hz: number) {
+  const m = 69 + 12 * Math.log2(Math.max(1e-6, hz) / 440);
+  if (!Number.isFinite(m)) return 69;
+  return Math.max(21, Math.min(108, Math.round(m)));
+}
+
 export function noteName(midi: number) {
   const name = NAMES[((midi % 12) + 12) % 12]!;
   const oct = Math.floor(midi / 12) - 1;

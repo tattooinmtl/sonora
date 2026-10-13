@@ -7,6 +7,7 @@ import {
   cyclesFor,
   downsample,
   fieldPitchForSeed,
+  hzToMidi,
   noteName,
   shapeFromNotes,
   synthesizeCycle,
@@ -386,13 +387,14 @@ export function FieldCanvas({ contained = false }: { contained?: boolean }) {
       const openBottom = local ? Math.max(openTop + 48, h - 8) : Math.max(openTop + 120, h - state.bottomInset);
       const top = openTop + 16;
       const bottom = openBottom - 12;
-      const noteKey = state.notes.join(",");
+      const shown = state.notes.length > 0 ? state.notes : [hzToMidi(state.hz)];
+      const noteKey = state.notes.length > 0 ? state.notes.join(",") : `hz${Math.round(state.hz)}`;
       const voiceSig = `${state.wave}|${noteKey}|${Math.round(w)}|${Math.round(top)}|${Math.round(bottom)}|${state.stabilized ? 1 : 0}`;
 
       let active: SimPath[] = [];
-      if (state.notes.length > 0) {
+      if (state.notes.length > 0 || !state.stabilized) {
         if (voiceSig !== pathSig) {
-          paths = layoutVoices(state.notes, state.wave, w, h, top, bottom, colors.length);
+          paths = layoutVoices(shown, state.wave, w, h, top, bottom, colors.length);
           pathSig = voiceSig;
           assignVoices(paths.length, !state.stabilized);
           ctx.save();
@@ -403,7 +405,7 @@ export function FieldCanvas({ contained = false }: { contained?: boolean }) {
           ctx.restore();
         }
         active = paths;
-        if (state.stabilized) lockedPaths = paths;
+        if (state.stabilized && state.notes.length > 0) lockedPaths = paths;
       } else if (state.stabilized && lockedPaths && lockedPaths.length > 0) {
         active = lockedPaths;
       } else if (!state.stabilized) {

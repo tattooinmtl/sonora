@@ -7,6 +7,7 @@ class AudioEngine {
   private master: GainNode | null = null;
   private voices = new Map<number, Voice>();
   private field: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+  private drive: { osc: OscillatorNode; gain: GainNode } | null = null;
   private vol = 0.75;
   private wave: Wave = "sine";
   private duck = 1;
@@ -40,11 +41,13 @@ class AudioEngine {
   setWave(wave: Wave) {
     this.wave = wave;
     for (const v of this.voices.values()) v.osc.type = wave;
+    if (this.drive) this.drive.osc.type = wave;
   }
 
   setKeyDuck(duck: number) {
     this.duck = duck;
     this.refreshVoiceGains();
+    this.refreshDrive();
   }
 
   private level() {
@@ -85,6 +88,48 @@ class AudioEngine {
     v.gain.gain.linearRampToValueAtTime(0, t + 0.06);
     v.osc.stop(t + 0.07);
     this.refreshVoiceGains();
+  }
+
+  /** Play hz only inside what a sound card can actually emit. */
+  setDrive(hz: number) {
+    this.unlock();
+    if (!this.ctx || !this.master) return;
+    const ceiling = Math.min(18000, this.ctx.sampleRate * 0.45);
+    if (!(hz >= 20 && hz <= ceiling)) {
+      this.stopDrive();
+      return;
+    }
+    if (!this.drive) {
+      const osc = this.ctx.createOscillator();
+      osc.type = this.wave;
+      osc.frequency.value = hz;
+      const gain = this.ctx.createGain();
+      gain.gain.value = 0;
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start();
+      this.drive = { osc, gain };
+    }
+    const t = this.ctx.currentTime;
+    this.drive.osc.type = this.wave;
+    this.drive.osc.frequency.setTargetAtTime(hz, t, 0.02);
+    this.refreshDrive();
+  }
+
+  private refreshDrive() {
+    if (!this.drive || !this.ctx) return;
+    this.drive.gain.gain.setTargetAtTime(0.11 * this.duck, this.ctx.currentTime, 0.03);
+  }
+
+  private stopDrive() {
+    if (!this.drive || !this.ctx) return;
+    const { osc, gain } = this.drive;
+    this.drive = null;
+    const t = this.ctx.currentTime;
+    gain.gain.cancelScheduledValues(t);
+    gain.gain.setValueAtTime(Math.max(0.0001, gain.gain.value), t);
+    gain.gain.linearRampToValueAtTime(0, t + 0.05);
+    osc.stop(t + 0.06);
   }
 
   playField(samples: Float32Array, freq: number) {

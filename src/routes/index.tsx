@@ -4,12 +4,16 @@ import { FieldStage } from "@/components/field-stage";
 import { StudioDock } from "@/components/studio-dock";
 import { audioEngine } from "@/lib/audio-engine";
 import { bindStudioAudio } from "@/lib/performance";
+import { useStudio } from "@/lib/studio-store";
 
 export const Route = createFileRoute("/")({ component: Home });
 
 function Home() {
   useEffect(() => {
-    const unlock = () => audioEngine.unlock();
+    const unlock = () => {
+      audioEngine.unlock();
+      audioEngine.setDrive(useStudio.getState().hz);
+    };
     window.addEventListener("pointerdown", unlock);
     window.addEventListener("keydown", unlock);
     const unbind = bindStudioAudio();
